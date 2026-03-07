@@ -1,7 +1,7 @@
 """Country intelligence, risk scoring, signal convergence, and analysis sources.
 
 Provides higher-level analytical functions that combine data from multiple
-APIs (World Bank, USGS, Cloudflare/IODA, OpenSky, GDELT) into country briefs,
+free public APIs (World Bank, USGS, IODA, GDELT) into country briefs,
 instability indices, geographic signal convergence, focal point detection,
 signal summaries, temporal anomalies, hotspot escalation, military surge,
 vessel tracking, and cascade analysis.
@@ -39,7 +39,6 @@ from ..config.countries import (
     get_event_multiplier,
     match_country_by_name,
 )
-from ..utils import haversine_km
 
 logger = logging.getLogger("world-events-mcp.sources.intelligence")
 
@@ -360,8 +359,7 @@ async def _instability_single(
             "internet_outages": outage_count,
             "news_articles": news_vel,
         },
-        "note": "CII based on security (military+outages) and information (GDELT) domains. "
-                "Conflict domain requires ACLED (not configured).",
+        "note": "CII based on security (military+outages) and information (GDELT) domains.",
         "source": "instability-index-v2",
         "timestamp": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
@@ -534,9 +532,9 @@ async def fetch_signal_convergence(
 async def fetch_focal_points(fetcher: Fetcher) -> dict:
     """Gather multi-source events and detect focal points.
 
-    Fetches news headlines, military flights, internet outages, and ACLED
-    protests in parallel, normalizes them into events, and runs focal point
-    detection to find entities where multiple signals converge.
+    Fetches news headlines, military flights, and internet outages in parallel,
+    normalizes them into events, and runs focal point detection to find
+    entities where multiple signals converge.
 
     Args:
         fetcher: Shared HTTP fetcher with caching and circuit breaking.
@@ -629,9 +627,9 @@ async def fetch_signal_summary(
 ) -> dict:
     """Run signal aggregator v2 across all domains.
 
-    Fetches ACLED conflict, USGS earthquakes, NASA FIRMS wildfires,
-    Cloudflare outages, military flights, and UNHCR displacement in parallel,
-    then aggregates signals by country with convergence scoring.
+    Fetches USGS earthquakes, internet outages, military flights, and UNHCR
+    displacement in parallel, then aggregates signals by country with
+    convergence scoring.
 
     Args:
         fetcher: Shared HTTP fetcher with caching and circuit breaking.
@@ -715,9 +713,9 @@ async def fetch_signal_summary(
 async def fetch_temporal_anomalies(fetcher: Fetcher) -> dict:
     """Record observations and check for temporal anomalies.
 
-    Fetches current counts of military flights (by theater), ACLED events
-    (by country), and fires (by region), records each as a temporal
-    observation, and reports any that deviate significantly from baselines.
+    Fetches current counts of military flights (by theater), records each
+    as a temporal observation, and reports any that deviate significantly
+    from baselines using Welford's algorithm.
 
     Args:
         fetcher: Shared HTTP fetcher with caching and circuit breaking.
@@ -742,33 +740,6 @@ async def fetch_temporal_anomalies(fetcher: Fetcher) -> dict:
         if result is not None:
             anomalies.append(result)
 
-    # ACLED events by country (top focus countries)
-    start_date = (now - timedelta(days=7)).strftime("%Y-%m-%d")
-    end_date = now.strftime("%Y-%m-%d")
-    data = await acled_query(
-        fetcher,
-        params={
-            "limit": 500,
-            "event_date": f"{start_date}|{end_date}",
-            "event_date_where": "BETWEEN",
-        },
-        cache_key="intel:temporal:acled:global:7d",
-        cache_ttl=1800,
-    )
-    if data is not None:
-        country_counts: dict[str, int] = {}
-        events_list = data.get("data", []) if isinstance(data, dict) else []
-        for event in events_list:
-            c = event.get("country")
-            if c:
-                country_counts[c] = country_counts.get(c, 0) + 1
-
-        for c_name, c_count in country_counts.items():
-            result = _temporal.record_and_check("acled_events", c_name, c_count)
-            observations_recorded += 1
-            if result is not None:
-                anomalies.append(result)
-
     # Sort anomalies by z_score descending
     anomalies.sort(key=lambda a: a.get("z_score", 0), reverse=True)
 
@@ -785,132 +756,6 @@ async def fetch_temporal_anomalies(fetcher: Fetcher) -> dict:
 # Function 8: Social Unrest Events (Protests + Riots)
 # ---------------------------------------------------------------------------
 
-async def fetch_unrest_events(
-    fetcher: Fetcher,
-    country: str | None = None,
-    days: int = 7,
-    limit: int = 100,
-) -> dict:
-    """Fetch social unrest events (protests + riots) from ACLED.
-
-    Filters by event_type in (Protests, Riots).
-    Applies Haversine deduplication: merges events within 50 km on the
-    same day to remove redundant reports.
-
-    Args:
-        fetcher: Shared HTTP fetcher with caching and circuit breaking.
-        country: Optional country name filter.
-        days: Lookback period in days.
-        limit: Maximum results from ACLED.
-
-    Returns:
-        Dict with events list, count, dedup stats, source, and timestamp.
-    """
-    now = datetime.now(timezone.utc)
-
-    start_date = (now - timedelta(days=days)).strftime("%Y-%m-%d")
-    end_date = now.strftime("%Y-%m-%d")
-
-    params: dict = {
-        "limit": limit,
-        "event_date": f"{start_date}|{end_date}",
-        "event_date_where": "BETWEEN",
-        "event_type": "Protests:Riots",
-        "event_type_where": "IN",
-    }
-    if country:
-        params["country"] = country
-
-    cache_label = country or "global"
-    data = await acled_query(
-        fetcher,
-        params=params,
-        cache_key=f"intel:unrest:{cache_label}:{days}",
-        cache_ttl=900,
-    )
-
-    if data is None:
-        return {
-            "error": "ACLED credentials not configured (ACLED_EMAIL + ACLED_PASSWORD)",
-            "source": "acled-unrest",
-            "timestamp": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        }
-
-    raw_events = data.get("data", []) if isinstance(data, dict) else []
-
-    # Parse events
-    parsed: list[dict] = []
-    for ev in raw_events:
-        lat_raw = ev.get("latitude")
-        lon_raw = ev.get("longitude")
-        lat = None
-        lon = None
-        try:
-            lat = float(lat_raw) if lat_raw is not None else None
-            lon = float(lon_raw) if lon_raw is not None else None
-        except (ValueError, TypeError):
-            pass
-
-        fat = 0
-        try:
-            fat = int(ev.get("fatalities", 0))
-        except (ValueError, TypeError):
-            pass
-
-        parsed.append({
-            "event_date": ev.get("event_date"),
-            "event_type": ev.get("event_type"),
-            "sub_event_type": ev.get("sub_event_type"),
-            "country": ev.get("country"),
-            "admin1": ev.get("admin1"),
-            "location": ev.get("location"),
-            "latitude": lat,
-            "longitude": lon,
-            "fatalities": fat,
-            "actor1": ev.get("actor1"),
-            "notes": ev.get("notes"),
-        })
-
-    # Haversine deduplication: merge events within 50km on same day
-    DEDUP_RADIUS_KM = 50.0
-    deduped: list[dict] = []
-    original_count = len(parsed)
-
-    for event in parsed:
-        lat = event.get("latitude")
-        lon = event.get("longitude")
-        edate = event.get("event_date")
-
-        is_dup = False
-        if lat is not None and lon is not None:
-            for existing in deduped:
-                if existing.get("event_date") != edate:
-                    continue
-                ex_lat = existing.get("latitude")
-                ex_lon = existing.get("longitude")
-                if ex_lat is None or ex_lon is None:
-                    continue
-                dist = haversine_km(lat, lon, ex_lat, ex_lon)
-                if dist < DEDUP_RADIUS_KM:
-                    # Merge: keep higher fatality count
-                    if event["fatalities"] > existing["fatalities"]:
-                        existing["fatalities"] = event["fatalities"]
-                    is_dup = True
-                    break
-
-        if not is_dup:
-            deduped.append(event)
-
-    return {
-        "events": deduped,
-        "count": len(deduped),
-        "deduplicated": original_count - len(deduped),
-        "query": {"country": country, "days": days},
-        "source": "acled-unrest",
-        "timestamp": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
-    }
-
-
 # ---------------------------------------------------------------------------
 # Function 9: Hotspot Escalation Scoring
 # ---------------------------------------------------------------------------
@@ -919,9 +764,7 @@ async def fetch_hotspot_escalation(fetcher: Fetcher) -> dict:
     """Score all 22 intel hotspots using multi-source signals.
 
     For each hotspot:
-    - Fetch GDELT mentions (news velocity near lat/lon)
     - Count military aircraft near hotspot (+/- 2 deg)
-    - Count ACLED events near hotspot (+/- 2 deg, last 7 days)
 
     Runs analysis.escalation.score_all_hotspots().
 
@@ -935,47 +778,21 @@ async def fetch_hotspot_escalation(fetcher: Fetcher) -> dict:
 
     from . import military as mil_mod
 
-    # Fetch global data once, then distribute to hotspots
-    async def _fetch_global_acled() -> list[dict]:
-        start_date = (now - timedelta(days=7)).strftime("%Y-%m-%d")
-        end_date = now.strftime("%Y-%m-%d")
-        data = await acled_query(
-            fetcher,
-            params={
-                "limit": 500,
-                "event_date": f"{start_date}|{end_date}",
-                "event_date_where": "BETWEEN",
-            },
-            cache_key="intel:escalation:acled:global:7d",
-            cache_ttl=1800,
-        )
-        if data is None:
-            return []
-        return data.get("data", []) if isinstance(data, dict) else []
-
-    async def _fetch_global_military() -> list[dict]:
-        # Use theater posture for global coverage
-        result = await mil_mod.fetch_theater_posture(fetcher)
-        aircraft = []
-        for theater_data in result.get("theaters", {}).values():
-            for ac in theater_data.get("countries", []):
-                # Create pseudo-aircraft entries at theater bbox center
-                bbox = theater_data.get("bbox", "")
-                parts = bbox.split(",")
-                if len(parts) == 4:
-                    try:
-                        lat = (float(parts[0]) + float(parts[2])) / 2
-                        lon = (float(parts[1]) + float(parts[3])) / 2
-                        for _ in range(theater_data.get("count", 0) // max(1, len(theater_data.get("countries", [1])))):
-                            aircraft.append({"lat": lat, "lon": lon, "origin_country": ac})
-                    except (ValueError, TypeError):
-                        pass
-        return aircraft
-
-    acled_events, military_data = await asyncio.gather(
-        _fetch_global_acled(),
-        _fetch_global_military(),
-    )
+    # Use theater posture for global military coverage
+    result = await mil_mod.fetch_theater_posture(fetcher)
+    military_data: list[dict] = []
+    for theater_data in result.get("theaters", {}).values():
+        for ac in theater_data.get("countries", []):
+            bbox = theater_data.get("bbox", "")
+            parts = bbox.split(",")
+            if len(parts) == 4:
+                try:
+                    lat = (float(parts[0]) + float(parts[2])) / 2
+                    lon = (float(parts[1]) + float(parts[3])) / 2
+                    for _ in range(theater_data.get("count", 0) // max(1, len(theater_data.get("countries", [1])))):
+                        military_data.append({"lat": lat, "lon": lon, "origin_country": ac})
+                except (ValueError, TypeError):
+                    pass
 
     # Build signal dict for each hotspot
     RADIUS_DEG = 2.0
@@ -985,28 +802,6 @@ async def fetch_hotspot_escalation(fetcher: Fetcher) -> dict:
         hs_lat = hs_config["lat"]
         hs_lon = hs_config["lon"]
 
-        # Count ACLED events near hotspot
-        conflict_count = 0
-        protest_count = 0
-        fatality_count = 0
-        for ev in acled_events:
-            try:
-                ev_lat = float(ev.get("latitude", 0))
-                ev_lon = float(ev.get("longitude", 0))
-            except (ValueError, TypeError):
-                continue
-            if abs(ev_lat - hs_lat) <= RADIUS_DEG and abs(ev_lon - hs_lon) <= RADIUS_DEG:
-                event_type = (ev.get("event_type") or "").lower()
-                if "protest" in event_type:
-                    protest_count += 1
-                else:
-                    conflict_count += 1
-                try:
-                    fatality_count += int(ev.get("fatalities", 0))
-                except (ValueError, TypeError):
-                    pass
-
-        # Count military aircraft near hotspot
         mil_count = 0
         for ac in military_data:
             ac_lat = ac.get("lat", 0)
@@ -1015,12 +810,12 @@ async def fetch_hotspot_escalation(fetcher: Fetcher) -> dict:
                 mil_count += 1
 
         hotspot_signals[hs_name] = {
-            "news_mentions": 0,  # Would require per-hotspot GDELT queries (expensive); baseline 0
+            "news_mentions": 0,
             "military_count": mil_count,
-            "conflict_events": conflict_count,
+            "conflict_events": 0,
             "convergence_score": 0,
-            "fatalities": fatality_count,
-            "protests": protest_count,
+            "fatalities": 0,
+            "protests": 0,
         }
 
     scored = score_all_hotspots(INTEL_HOTSPOTS, hotspot_signals)
