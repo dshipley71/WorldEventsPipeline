@@ -180,7 +180,7 @@ TOOLS: list[Tool] = [
     # --- Infrastructure (2 tools) ---
     Tool(
         name="intel_internet_outages",
-        description="Get internet outages from Cloudflare Radar (last 7 days). Optional: CLOUDFLARE_API_TOKEN for higher limits.",
+        description="Get internet outages from IODA (Georgia Tech Internet Intelligence) — last 7 days of outage signals, no API key required.",
         inputSchema={"type": "object", "properties": {}},
     ),
     Tool(
@@ -383,7 +383,7 @@ TOOLS: list[Tool] = [
     # --- Intelligence (13 tools) ---
     Tool(
         name="intel_country_brief",
-        description="Generate a country intelligence brief using Ollama LLM + World Bank + ACLED data. Falls back to data-only if LLM unavailable.",
+        description="Generate a country intelligence brief using Ollama LLM + World Bank data. Falls back to data-only if LLM unavailable.",
         inputSchema={
             "type": "object",
             "properties": {
@@ -866,7 +866,7 @@ TOOLS: list[Tool] = [
     # --- Central Banks (1 tool) ---
     Tool(
         name="intel_central_bank_rates",
-        description="Policy rates for 15 major central banks: Fed, ECB, BoE, BoJ, PBoC, RBI, RBA, BoC, SNB, BCB, BoK, CBRT, SARB, Banxico, BI. Live FRED data when API key set, curated fallback otherwise.",
+        description="Policy rates for 15 major central banks: Fed, ECB, BoE, BoJ, PBoC, RBI, RBA, BoC, SNB, BCB, BoK, CBRT, SARB, Banxico, BI. Curated static rates, no API key required.",
         inputSchema={"type": "object", "properties": {}},
     ),
     # --- Trade Routes (1 tool) ---
@@ -905,34 +905,11 @@ TOOLS: list[Tool] = [
             },
         },
     ),
-    # --- Traffic (2 tools) ---
-    Tool(
-        name="intel_traffic_flow",
-        description="Real-time traffic congestion for 20 major world cities via TomTom API. Congestion percentage, speeds, global average. Requires TOMTOM_API_KEY.",
-        inputSchema={"type": "object", "properties": {}},
-    ),
-    Tool(
-        name="intel_traffic_incidents",
-        description="Major traffic incidents across 5 strategic regions (US East/West, Europe, Middle East, East Asia) via TomTom API. Requires TOMTOM_API_KEY.",
-        inputSchema={"type": "object", "properties": {}},
-    ),
     # --- Aviation domestic (1 tool) ---
     Tool(
         name="intel_aviation_domestic",
         description="Global air traffic snapshot from OpenSky Network: total airborne aircraft, regional breakdown, busiest origin countries, and sampled positions for mapping.",
         inputSchema={"type": "object", "properties": {}},
-    ),
-    # --- Webcams (1 tool) ---
-    Tool(
-        name="intel_webcams",
-        description="Public webcam locations and live previews worldwide from Windy Webcams API. Filter by category (traffic, weather, landscape). Requires WINDY_API_KEY.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "category": {"type": "string", "description": "Webcam category (traffic, weather, landscape, etc.)", "default": "traffic"},
-                "limit": {"type": "integer", "description": "Max cameras to return (default 50)", "default": 50},
-            },
-        },
     ),
     # --- System (1 tool) ---
     Tool(
@@ -1332,26 +1309,9 @@ async def _dispatch(name: str, arguments: dict[str, Any]) -> Any:
                 z_threshold=arguments.get("z_threshold", 2.0),
             )
 
-        # Traffic
-        case "intel_traffic_flow":
-            from .sources.traffic import fetch_traffic_flow
-            return await fetch_traffic_flow(fetcher)
-        case "intel_traffic_incidents":
-            from .sources.traffic import fetch_traffic_incidents
-            return await fetch_traffic_incidents(fetcher)
-
         # Aviation domestic
         case "intel_aviation_domestic":
             return await aviation.fetch_domestic_flights(fetcher)
-
-        # Webcams
-        case "intel_webcams":
-            from .sources.webcams import fetch_webcams
-            return await fetch_webcams(
-                fetcher,
-                category=arguments.get("category", "traffic"),
-                limit=arguments.get("limit", 50),
-            )
 
         # System
         case "intel_status":
@@ -1361,15 +1321,15 @@ async def _dispatch(name: str, arguments: dict[str, Any]) -> Any:
                 "cache_freshness": cache.freshness(),
                 "sources": {
                     "markets": ["yahoo-finance", "coingecko", "alternative-me", "mempool"],
-                    "economic": ["eia", "fred", "world-bank"],
-                    "natural": ["usgs", "nasa-firms"],
-                    "conflict": ["acled", "ucdp", "hdx"],
-                    "military": ["opensky", "hexdb", "adsblol"],
-                    "infrastructure": ["cloudflare-radar", "ioda", "nga-msi"],
+                    "economic": ["world-bank"],
+                    "natural": ["usgs"],
+                    "conflict": ["ucdp", "hdx"],
+                    "military": ["hexdb", "adsblol"],
+                    "infrastructure": ["ioda", "nga-msi"],
                     "maritime": ["nga-msi"],
                     "climate": ["open-meteo"],
                     "news": ["rss-aggregator", "gdelt"],
-                    "intelligence": ["ollama", "acled", "world-bank", "hdx", "usgs"],
+                    "intelligence": ["ollama", "world-bank", "hdx", "usgs"],
                     "prediction": ["polymarket"],
                     "displacement": ["unhcr"],
                     "aviation": ["faa"],

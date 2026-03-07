@@ -1,12 +1,11 @@
 """Internet infrastructure monitoring for world-events-mcp.
 
-Provides real-time data on internet outages (Cloudflare Radar) and
+Provides real-time data on internet outages (IODA) and
 undersea cable corridor health (NGA Maritime Safety Information).
 """
 
 import asyncio
 import logging
-import os
 import re
 from datetime import datetime, timezone
 
@@ -14,17 +13,6 @@ from ..fetcher import Fetcher
 from ..utils import utc_now_iso
 
 logger = logging.getLogger("world-events-mcp.sources.infrastructure")
-
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-
-_CF_RADAR_OUTAGES_URL = (
-    "https://radar.cloudflare.com/api/v1/annotations/outages"
-)
-_CF_RADAR_TAMPERING_URL = (
-    "https://api.cloudflare.com/client/v4/radar/connection_tampering/summary"
-)
 
 _NGA_BROADCAST_WARN_URL = (
     "https://msi.nga.mil/api/publications/broadcast-warn"
@@ -227,118 +215,28 @@ async def _fetch_ioda_outages(fetcher: Fetcher) -> dict | None:
 
 
 # ---------------------------------------------------------------------------
-# Internet Outages (Cloudflare Radar)
+# Internet Outages (IODA)
 # ---------------------------------------------------------------------------
 
 async def fetch_internet_outages(fetcher: Fetcher) -> dict:
-    """Fetch recent internet outage annotations from Cloudflare Radar.
+    """Fetch recent internet outage signals from IODA (Georgia Tech Internet Intelligence).
 
-    Tries authenticated Cloudflare Radar API first (requires
-    ``CLOUDFLARE_API_TOKEN``).  Falls back to IODA (Georgia Tech
-    Internet Intelligence) public API for internet outage signals.
+    Uses the free public IODA API — no API key required.
 
     Returns:
         Dict with outages list, ongoing/total counts, source, and timestamp.
     """
-    token = os.environ.get("CLOUDFLARE_API_TOKEN")
-    now_iso = utc_now_iso()
+    data = await _fetch_ioda_outages(fetcher)
+    if data is not None:
+        return data
 
-    data = None
-
-    # --- Attempt 1: Cloudflare Radar (requires token) ---
-    if token:
-        headers = {"Authorization": f"Bearer {token}"}
-        data = await fetcher.get_json(
-            url=_CF_RADAR_OUTAGES_URL,
-            source="cloudflare-radar",
-            cache_key="infra:outages:cf",
-            cache_ttl=300,
-            headers=headers,
-            params={"limit": 20, "dateRange": "7d"},
-        )
-
-    # --- Attempt 2: IODA public API (no auth needed) ---
-    if data is None:
-        data = await _fetch_ioda_outages(fetcher)
-        if data is not None:
-            return data  # IODA already returns our output shape
-
-    if data is None:
-        note = "Set CLOUDFLARE_API_TOKEN for detailed outage data" if not token else None
-        logger.warning("Internet outages: no data from Cloudflare or IODA")
-        result: dict = {
-            "outages": [],
-            "ongoing_count": 0,
-            "total_7d": 0,
-            "source": "cloudflare-radar",
-            "timestamp": now_iso,
-        }
-        if note:
-            result["note"] = note
-        return result
-
-    outages: list[dict] = []
-
-    # The public annotations endpoint returns:
-    # { "annotations": [ { "id", "dateStart", "dateEnd", "description",
-    #                       "scope", "asns", "locations", ... } ] }
-    # Adapt to both envelope shapes: top-level list or nested under a key.
-    raw_annotations: list = []
-    if isinstance(data, list):
-        raw_annotations = data
-    elif isinstance(data, dict):
-        # Try common envelope keys
-        for key in ("annotations", "result", "data"):
-            candidate = data.get(key)
-            if isinstance(candidate, list):
-                raw_annotations = candidate
-                break
-
-    ongoing_count = 0
-
-    for ann in raw_annotations:
-        if not isinstance(ann, dict):
-            continue
-
-        date_end = ann.get("dateEnd") or ann.get("endDate")
-        is_ongoing = date_end is None or date_end == ""
-
-        if is_ongoing:
-            ongoing_count += 1
-
-        # Normalize ASN list
-        raw_asns = ann.get("asns", [])
-        if isinstance(raw_asns, str):
-            raw_asns = [a.strip() for a in raw_asns.split(",") if a.strip()]
-        elif not isinstance(raw_asns, list):
-            raw_asns = []
-
-        # Normalize locations / country codes
-        raw_locations = ann.get("locations", ann.get("countries", []))
-        if isinstance(raw_locations, str):
-            raw_locations = [
-                loc.strip() for loc in raw_locations.split(",") if loc.strip()
-            ]
-        elif not isinstance(raw_locations, list):
-            raw_locations = []
-
-        outages.append({
-            "id": ann.get("id"),
-            "start": ann.get("dateStart") or ann.get("startDate"),
-            "end": date_end if not is_ongoing else None,
-            "description": ann.get("description", ""),
-            "scope": ann.get("scope", "unknown"),
-            "countries": raw_locations,
-            "asns": raw_asns,
-            "is_ongoing": is_ongoing,
-        })
-
+    logger.warning("Internet outages: no data from IODA")
     return {
-        "outages": outages,
-        "ongoing_count": ongoing_count,
-        "total_7d": len(outages),
-        "source": "cloudflare-radar",
-        "timestamp": now_iso,
+        "outages": [],
+        "ongoing_count": 0,
+        "total_7d": 0,
+        "source": "ioda-gatech",
+        "timestamp": utc_now_iso(),
     }
 
 

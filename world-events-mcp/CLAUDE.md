@@ -72,13 +72,13 @@ dashboard/app.py (SSE)  ─┘                                                  
 
 ## Environment Variables
 
-Only these unlock additional data sources (everything else works unauthenticated):
-- `ACLED_ACCESS_TOKEN` — conflict events
-- `NASA_FIRMS_API_KEY` — satellite wildfire data
-- `EIA_API_KEY` — energy prices
-- `CLOUDFLARE_API_TOKEN` — internet outage data
-- `FRED_API_KEY` — macro economic data
-- `OPENSKY_CLIENT_ID` / `OPENSKY_CLIENT_SECRET` — military flight fallback
+Optional configuration (all data sources work without any API keys):
+- `OLLAMA_API_URL` — local Ollama LLM URL (default: `http://localhost:11434`)
+- `OLLAMA_MODEL` — Ollama model to use (default: `llama3.2`)
+- `WORLD_INTEL_LOG_LEVEL` — log level (default: `INFO`)
+- `WORLD_INTEL_GDELT_MIN_INTERVAL` — minimum seconds between GDELT requests (default: `6.0`)
+- `WORLD_INTEL_FETCHER_TIMEOUT` — HTTP timeout in seconds (default: `15.0`)
+- `WORLD_INTEL_FETCHER_MAX_RETRIES` — max HTTP retries (default: `2`)
 
 ## Testing
 
