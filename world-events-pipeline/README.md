@@ -7,7 +7,7 @@ built on GDELT DOC 2.0, RSS feeds, MCP tool servers, and Ollama Cloud LLMs.
 
 ## Features
 
-- **GDELT integration** — artlist, timelinevol, timelinevolraw, timelinetone (MCP-first with direct HTTP fallback)
+- **GDELT integration** — artlist, timelinevol, timelinevolraw, timelinevolinfo, timelinetone, timelinesourcecountry, timelinelang, tonechart (MCP-first with direct HTTP fallback)
 - **Statistical spike detection** — z-score analysis on raw article volume
 - **MiniLM semantic ranking** — re-ranks both GDELT and RSS articles by query relevance
 - **Parallel MCP enrichment** — keyword spikes, topic clusters, NER entity extraction
@@ -116,7 +116,7 @@ orch = WorldEventsOrchestrator(server_command="my-custom-mcp")
 
 | Tool | Purpose |
 |------|---------|
-| `intel_gdelt_search` | GDELT artlist + timeline modes |
+| `intel_gdelt_search` | GDELT artlist, all timeline modes, tonechart, with sort, date range, source country/lang/theme filters |
 | `intel_news_feed` | RSS article fetch |
 | `intel_keyword_spikes` | Trending keyword detection |
 | `intel_news_clusters` | Topic cluster grouping |
