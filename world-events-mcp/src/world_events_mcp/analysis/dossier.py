@@ -1,7 +1,7 @@
 """Comprehensive country intelligence dossier.
 
 Aggregates data from multiple sources into a single country profile:
-country brief (World Bank + ACLED), stock index, election calendar,
+country brief (World Bank), stock index, election calendar,
 sanctions exposure, news mentions, and associated hotspots/conflict zones.
 
 All sub-queries are run in parallel for speed.
@@ -58,7 +58,7 @@ async def fetch_country_dossier(
     """Build a comprehensive country intelligence dossier.
 
     Pulls from 6 sources in parallel:
-      1. Country brief (World Bank GDP/inflation + ACLED conflict)
+      1. Country brief (World Bank GDP/inflation)
       2. Stock market index (Yahoo Finance)
       3. Election calendar (curated dataset)
       4. Sanctions exposure (OFAC SDN search)

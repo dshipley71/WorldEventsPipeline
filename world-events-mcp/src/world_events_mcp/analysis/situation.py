@@ -27,7 +27,7 @@ def _extract_metrics(data: dict) -> dict:
     mil = data.get("military_flights", {})
     mil_count = mil.get("count", 0) if isinstance(mil, dict) else 0
 
-    conflict_src = data.get("acled_events") or data.get("conflict_zones") or data.get("ucdp_events") or {}
+    conflict_src = data.get("conflict_zones") or data.get("ucdp_events") or {}
     conflict_count = conflict_src.get("count", 0) if isinstance(conflict_src, dict) else 0
 
     fires = data.get("wildfires", {})
@@ -62,9 +62,6 @@ def _extract_metrics(data: dict) -> dict:
     domestic = data.get("domestic_flights", {})
     total_aircraft = domestic.get("total_aircraft", 0) if isinstance(domestic, dict) else 0
 
-    traffic = data.get("traffic_flow", {})
-    avg_congestion = traffic.get("global_avg_congestion", 0) if isinstance(traffic, dict) else 0
-
     return {
         "earthquakes": quakes,
         "max_magnitude": round(max_mag, 1),
@@ -78,7 +75,6 @@ def _extract_metrics(data: dict) -> dict:
         "kp_index": round(kp, 1),
         "outbreaks": outbreaks,
         "total_aircraft": total_aircraft,
-        "avg_congestion": avg_congestion,
         "top_headlines": headlines,
     }
 
@@ -98,7 +94,6 @@ CYBER: {m['cyber_threats']} tracked IOCs
 SPACE WEATHER: Kp {m['kp_index']}
 HEALTH: {m['outbreaks']} high-concern outbreaks
 AIR TRAFFIC: {m['total_aircraft']} aircraft airborne
-TRAFFIC: {m['avg_congestion']}% avg city congestion
 
 TOP HEADLINES:
 {headline_block}
@@ -118,7 +113,7 @@ def _fallback_brief(m: dict) -> str:
         f"MILITARY: {m['military_aircraft']} aircraft tracked. CONFLICT: {m['conflicts']} active events.",
         f"SEISMIC: {m['earthquakes']} earthquakes (max M{m['max_magnitude']}). FIRES: {m['fire_clusters']} clusters.",
         f"CYBER: {m['cyber_threats']} IOCs. HEALTH: {m['outbreaks']} high-concern outbreaks.",
-        f"SPACE: Kp {m['kp_index']}. AIR TRAFFIC: {m['total_aircraft']} airborne. CONGESTION: {m['avg_congestion']}%.",
+        f"SPACE: Kp {m['kp_index']}. AIR TRAFFIC: {m['total_aircraft']} airborne.",
     ]
     return "\n".join(lines)
 

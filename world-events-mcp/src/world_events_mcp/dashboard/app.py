@@ -42,8 +42,6 @@ from world_events_mcp.sources import (
     social,
     nuclear,
     service_status,
-    traffic,
-    webcams,
 )
 from world_events_mcp.analysis.alerts import fetch_alert_digest, fetch_weekly_trends
 from world_events_mcp.analysis.posture import fetch_strategic_posture
@@ -118,9 +116,6 @@ async def _fetch_overview() -> dict:
         "usni_fleet": fetch_usni_fleet(fetcher),
         "population_exposure": fetch_population_exposure(fetcher),
         "domestic_flights": aviation.fetch_domestic_flights(fetcher),
-        "traffic_flow": traffic.fetch_traffic_flow(fetcher),
-        "traffic_incidents": traffic.fetch_traffic_incidents(fetcher),
-        "webcams": webcams.fetch_webcams(fetcher),
         "btc_technicals": markets.fetch_btc_technicals(fetcher),
         "central_bank_rates": fetch_central_bank_rates(fetcher),
     }

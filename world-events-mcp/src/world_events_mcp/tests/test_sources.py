@@ -137,61 +137,8 @@ async def test_fetch_earthquakes(fetcher: Fetcher) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Wildfire
-# ---------------------------------------------------------------------------
-
-
-@respx.mock
-@pytest.mark.asyncio
-async def test_fetch_wildfires_no_api_key(fetcher: Fetcher) -> None:
-    from world_events_mcp.sources.wildfire import fetch_wildfires
-
-    with patch.dict("os.environ", {}, clear=False):
-        # Remove the key if present
-        import os
-        os.environ.pop("NASA_FIRMS_API_KEY", None)
-        result = await fetch_wildfires(fetcher, api_key=None)
-
-    assert "error" in result
-
-
-@respx.mock
-@pytest.mark.asyncio
-async def test_fetch_wildfires_single_region(fetcher: Fetcher) -> None:
-    from world_events_mcp.sources.wildfire import fetch_wildfires
-
-    csv_data = (
-        "latitude,longitude,bright_ti4,scan,track,acq_date,acq_time,satellite,confidence,version,bright_ti5,frp,daynight\n"
-        "34.5,-118.2,350.0,0.5,0.5,2024-02-23,1200,N,high,2.0,290.0,45.0,D\n"
-        "34.6,-118.3,360.0,0.5,0.5,2024-02-23,1200,N,high,2.0,295.0,55.0,D\n"
-        "34.5,-118.2,340.0,0.5,0.5,2024-02-23,1200,N,low,2.0,285.0,30.0,D\n"
-    )
-
-    respx.get(url__regex=r".*firms\.modaps\.eosdis\.nasa\.gov.*").mock(
-        return_value=httpx.Response(200, text=csv_data)
-    )
-
-    result = await fetch_wildfires(fetcher, region="north_america", api_key="testkey")
-    assert "fires_by_region" in result
-    na = result["fires_by_region"]["north_america"]
-    assert na["count"] == 2  # only 2 high-confidence
-    assert result["total_fires"] == 2
-
-
-# ---------------------------------------------------------------------------
 # Economic
 # ---------------------------------------------------------------------------
-
-
-@respx.mock
-@pytest.mark.asyncio
-async def test_fetch_fred_series_no_key(fetcher: Fetcher) -> None:
-    from world_events_mcp.sources.economic import fetch_fred_series
-
-    import os
-    os.environ.pop("FRED_API_KEY", None)
-    result = await fetch_fred_series(fetcher, series_id="UNRATE", api_key=None)
-    assert "error" in result
 
 
 @respx.mock
@@ -467,13 +414,13 @@ async def test_fetch_nuclear_monitor(fetcher: Fetcher) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Infrastructure (Cloudflare + IODA fallback)
+# Infrastructure (IODA)
 # ---------------------------------------------------------------------------
 
 
 @respx.mock
 @pytest.mark.asyncio
-async def test_fetch_internet_outages_ioda_fallback(fetcher: Fetcher) -> None:
+async def test_fetch_internet_outages_ioda(fetcher: Fetcher) -> None:
     from world_events_mcp.sources.infrastructure import fetch_internet_outages
 
     # IODA response shape
@@ -494,17 +441,9 @@ async def test_fetch_internet_outages_ioda_fallback(fetcher: Fetcher) -> None:
         ]
     }
 
-    # Cloudflare returns 403 (no token)
-    respx.get(url__regex=r".*cloudflare\.com.*").mock(
-        return_value=httpx.Response(403, json={"error": "unauthorized"})
-    )
-    # IODA responds
     respx.get(url__regex=r".*ioda\.inetintel.*").mock(
         return_value=httpx.Response(200, json=ioda_response)
     )
-
-    import os
-    os.environ.pop("CLOUDFLARE_API_TOKEN", None)
 
     result = await fetch_internet_outages(fetcher)
     assert result["source"] == "ioda-gatech"
@@ -541,7 +480,7 @@ async def test_fetch_cable_health(fetcher: Fetcher) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Conflict (UCDP + ACLED)
+# Conflict (UCDP + HDX)
 # ---------------------------------------------------------------------------
 
 
@@ -960,52 +899,15 @@ async def test_fetch_btc_technicals_insufficient_data(fetcher: Fetcher) -> None:
 
 @respx.mock
 @pytest.mark.asyncio
-async def test_fetch_central_bank_rates_no_fred(fetcher: Fetcher) -> None:
+async def test_fetch_central_bank_rates(fetcher: Fetcher) -> None:
     from world_events_mcp.sources.central_banks import fetch_central_bank_rates
 
-    import os
-    os.environ.pop("FRED_API_KEY", None)
-
     result = await fetch_central_bank_rates(fetcher)
-    assert result["source"] == "multi"
-    assert result["fred_available"] is False
-    # Should have all 15 banks (12 curated + 3 FRED-fallback curated)
+    assert result["source"] == "curated"
     assert result["count"] == 15
     # Sorted by rate descending — CBRT (45%) should be first
     assert result["rates"][0]["bank"] == "Central Bank of Turkey"
     assert result["rates"][0]["rate"] == 45.00
-    # All should be curated source
-    assert all(r["source"] == "curated" for r in result["rates"])
-
-
-@respx.mock
-@pytest.mark.asyncio
-async def test_fetch_central_bank_rates_with_fred(fetcher: Fetcher) -> None:
-    from world_events_mcp.sources.central_banks import fetch_central_bank_rates
-
-    import os
-    os.environ["FRED_API_KEY"] = "test_key_123"
-
-    fred_response = {
-        "observations": [
-            {"date": "2026-02-25", "value": "4.33"}
-        ]
-    }
-
-    respx.get("https://api.stlouisfed.org/fred/series/observations").mock(
-        return_value=httpx.Response(200, json=fred_response)
-    )
-
-    try:
-        result = await fetch_central_bank_rates(fetcher)
-        assert result["source"] == "multi"
-        assert result["fred_available"] is True
-        assert result["count"] == 15
-        # At least some should be from FRED
-        fred_sources = [r for r in result["rates"] if r["source"] == "fred"]
-        assert len(fred_sources) >= 1
-    finally:
-        os.environ.pop("FRED_API_KEY", None)
 
 
 # ---------------------------------------------------------------------------
@@ -1209,7 +1111,6 @@ async def test_fetch_country_dossier(fetcher: Fetcher) -> None:
             [{"date": "2024", "value": 3.2}],
         ])
     )
-    # Mock ACLED (no key = skip)
     # Mock Yahoo Finance for country stocks
     respx.get("https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC").mock(
         return_value=httpx.Response(200, json={
@@ -1256,56 +1157,6 @@ async def test_fetch_country_dossier_invalid_code(fetcher: Fetcher) -> None:
     assert "Unknown" in result["error"]
 
 
-# ---------------------------------------------------------------------------
-# Traffic (Phase 16)
-# ---------------------------------------------------------------------------
-
-@pytest.mark.asyncio
-@respx.mock
-async def test_fetch_traffic_flow_no_key(fetcher: Fetcher) -> None:
-    """Traffic flow returns error when TOMTOM_API_KEY is not set."""
-    from world_events_mcp.sources.traffic import fetch_traffic_flow
-
-    with patch.dict("os.environ", {}, clear=True):
-        result = await fetch_traffic_flow(fetcher)
-
-    assert "error" in result
-    assert "TOMTOM_API_KEY" in result["error"]
-
-
-@pytest.mark.asyncio
-@respx.mock
-async def test_fetch_traffic_flow_with_key(fetcher: Fetcher) -> None:
-    """Traffic flow fetches congestion data from TomTom."""
-    from world_events_mcp.sources.traffic import fetch_traffic_flow
-
-    respx.route().mock(return_value=httpx.Response(200, json={
-        "flowSegmentData": {
-            "currentSpeed": 30.0,
-            "freeFlowSpeed": 60.0,
-        },
-    }))
-
-    with patch.dict("os.environ", {"TOMTOM_API_KEY": "test-key"}):
-        result = await fetch_traffic_flow(fetcher)
-
-    assert result["source"] == "tomtom"
-    assert result["count"] > 0
-    assert result["global_avg_congestion"] == 50.0  # (1 - 30/60) * 100
-    assert result["cities"][0]["congestion_pct"] == 50
-
-
-@pytest.mark.asyncio
-@respx.mock
-async def test_fetch_traffic_incidents_no_key(fetcher: Fetcher) -> None:
-    """Traffic incidents returns error when no API key."""
-    from world_events_mcp.sources.traffic import fetch_traffic_incidents
-
-    with patch.dict("os.environ", {}, clear=True):
-        result = await fetch_traffic_incidents(fetcher)
-
-    assert "error" in result
-
 
 # ---------------------------------------------------------------------------
 # Aviation Domestic (Phase 16)
@@ -1334,46 +1185,3 @@ async def test_fetch_domestic_flights(fetcher: Fetcher) -> None:
     assert len(result["by_region"]) > 0
     assert len(result["busiest_origins"]) > 0
 
-
-# ---------------------------------------------------------------------------
-# Webcams (Phase 16)
-# ---------------------------------------------------------------------------
-
-@pytest.mark.asyncio
-async def test_fetch_webcams_no_key(fetcher: Fetcher) -> None:
-    """Webcams returns error when WINDY_API_KEY is not set."""
-    from world_events_mcp.sources.webcams import fetch_webcams
-
-    with patch.dict("os.environ", {}, clear=True):
-        result = await fetch_webcams(fetcher)
-
-    assert "error" in result
-    assert "WINDY_API_KEY" in result["error"]
-
-
-@pytest.mark.asyncio
-@respx.mock
-async def test_fetch_webcams_with_key(fetcher: Fetcher) -> None:
-    """Webcams fetches camera data from Windy API."""
-    from world_events_mcp.sources.webcams import fetch_webcams
-
-    respx.route().mock(return_value=httpx.Response(200, json={
-        "webcams": [
-            {
-                "webcamId": "cam-1",
-                "title": "Times Square",
-                "location": {"latitude": 40.758, "longitude": -73.985, "city": "New York", "country": "US"},
-                "images": {"current": {"preview": "https://example.com/prev.jpg", "thumbnail": "https://example.com/thumb.jpg"}},
-                "player": {"day": {"embed": "https://example.com/player"}},
-                "status": "active",
-            },
-        ],
-    }))
-
-    with patch.dict("os.environ", {"WINDY_API_KEY": "test-key"}):
-        result = await fetch_webcams(fetcher, category="traffic", limit=10)
-
-    assert result["source"] == "windy-webcams"
-    assert result["count"] == 1
-    assert result["cameras"][0]["title"] == "Times Square"
-    assert result["cameras"][0]["lat"] == 40.758

@@ -1137,70 +1137,8 @@ def exchanges_cmd(ctx: click.Context, tier: str | None, country: str | None) -> 
 
 
 # ---------------------------------------------------------------------------
-# Traffic, Aviation, Webcams
+# Aviation
 # ---------------------------------------------------------------------------
-
-@main.command()
-@click.pass_context
-def traffic(ctx: click.Context) -> None:
-    """Real-time traffic congestion for 20 major cities (TomTom)."""
-    from .sources.traffic import fetch_traffic_flow
-    f = _get_fetcher()
-    data = _run(fetch_traffic_flow(f))
-
-    if ctx.obj.get("json") or "error" in data:
-        _print_json(data)
-        return
-
-    console.print(f"[bold]Global Traffic[/bold] — {data.get('count', 0)} cities, "
-                  f"avg congestion {data.get('global_avg_congestion', 0):.0f}%\n")
-
-    table = Table(box=box.SIMPLE_HEAVY)
-    table.add_column("City", style="bold")
-    table.add_column("Country")
-    table.add_column("Congestion %", justify="right")
-    table.add_column("Speed (km/h)", justify="right")
-
-    for c in data.get("cities", [])[:20]:
-        cong = c.get("congestion_pct", 0)
-        style = "red" if cong > 60 else "yellow" if cong > 30 else "green"
-        table.add_row(c.get("name", ""), c.get("country", ""),
-                      f"[{style}]{cong}%[/{style}]",
-                      str(c.get("current_speed_kmh", "")))
-    console.print(table)
-
-
-@main.command()
-@click.pass_context
-def incidents(ctx: click.Context) -> None:
-    """Major traffic incidents across strategic regions (TomTom)."""
-    from .sources.traffic import fetch_traffic_incidents
-    f = _get_fetcher()
-    data = _run(fetch_traffic_incidents(f))
-
-    if ctx.obj.get("json") or "error" in data:
-        _print_json(data)
-        return
-
-    console.print(f"[bold]Traffic Incidents[/bold] — {data.get('total_count', 0)} across "
-                  f"{data.get('regions_checked', 0)} regions\n")
-
-    table = Table(box=box.SIMPLE_HEAVY)
-    table.add_column("Region")
-    table.add_column("Description", max_width=40)
-    table.add_column("Delay (min)", justify="right")
-    table.add_column("Road")
-
-    for inc in data.get("incidents", [])[:20]:
-        delay_min = round(inc.get("delay_seconds", 0) / 60)
-        table.add_row(
-            inc.get("region", ""),
-            inc.get("description", "")[:40],
-            str(delay_min) if delay_min else "-",
-            inc.get("from_road", "")[:30],
-        )
-    console.print(table)
-
 
 @main.command(name="air-traffic")
 @click.pass_context
@@ -1229,34 +1167,6 @@ def air_traffic_cmd(ctx: click.Context) -> None:
         console.print("\n[bold]Busiest Origins:[/bold]")
         for o in data["busiest_origins"][:10]:
             console.print(f"  {o['country']}: {o['count']}")
-
-
-@main.command()
-@click.option("--category", "-c", default="traffic", help="Webcam category")
-@click.option("--limit", "-n", default=20, help="Max cameras")
-@click.pass_context
-def webcams_cmd(ctx: click.Context, category: str, limit: int) -> None:
-    """Public webcam locations worldwide (Windy)."""
-    from .sources.webcams import fetch_webcams
-    f = _get_fetcher()
-    data = _run(fetch_webcams(f, category=category, limit=limit))
-
-    if ctx.obj.get("json") or "error" in data:
-        _print_json(data)
-        return
-
-    console.print(f"[bold]Webcams[/bold] — {data.get('count', 0)} cameras ({category})\n")
-
-    table = Table(box=box.SIMPLE_HEAVY)
-    table.add_column("Title", style="bold", max_width=30)
-    table.add_column("City")
-    table.add_column("Country")
-    table.add_column("Status")
-
-    for cam in data.get("cameras", []):
-        table.add_row(cam.get("title", "")[:30], cam.get("city", ""),
-                      cam.get("country", ""), cam.get("status", ""))
-    console.print(table)
 
 
 # ---------------------------------------------------------------------------

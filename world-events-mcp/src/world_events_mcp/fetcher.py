@@ -31,12 +31,10 @@ _SOURCE_RATE_LIMITS: dict[str, float] = {
     "coingecko": 2.0,           # free tier: 30 calls/min
     "cloudflare-radar": 3.0,    # 20 req/min
     "reddit": 1.5,              # ~60 req/min (be conservative)
-    "nasa-firms": 2.0,          # API key: ~1000 req/day
     "adsblol": 5.0,             # community API — be very polite
     "polymarket": 1.0,          # be polite
     "faa": 1.0,                 # govt API
     "usgs": 1.0,                # generous but be polite
-    "acled": 2.0,               # API key based
     "nga": 2.0,                 # govt API
     # GDELT doc API: published guidance is ~1 request / 5 seconds.
     # Make this configurable because shared/public IPs (e.g., Colab) can be rate-limited more aggressively.
