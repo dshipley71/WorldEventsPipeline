@@ -28,7 +28,7 @@ def score_hotspot(
         hotspot_config: From INTEL_HOTSPOTS: {lat, lon, baseline_escalation, associated_countries}.
         news_mentions: GDELT article count near hotspot.
         military_count: Aircraft near hotspot.
-        conflict_events: ACLED events near hotspot.
+        conflict_events: Conflict event count near hotspot.
         convergence_score: From geo-convergence.
         fatalities: Total fatalities from conflict events.
         protests: Protest event count near hotspot.

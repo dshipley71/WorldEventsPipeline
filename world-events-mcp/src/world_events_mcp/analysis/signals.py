@@ -38,13 +38,13 @@ def aggregate_country_signals(
     """Aggregate multi-domain signals by country.
 
     Args:
-        conflict_events: ACLED/UCDP events with 'country' field.
+        conflict_events: UCDP/HDX conflict events with 'country' field.
         displacement_data: UNHCR data with 'country' field.
         earthquake_data: USGS earthquakes (uses reverse geocoding heuristic).
         fire_data: Wildfire data as list of dicts with optional 'country' or 'region' field.
         outage_data: Internet outages with 'countries' field (list of country codes).
         military_data: Military aircraft data with 'origin_country' field.
-        protest_data: ACLED protests/riots subset with 'country' field.
+        protest_data: Protest/riot events with 'country' field.
 
     Returns:
         Dict mapping country name to signal summary with convergence scoring.
