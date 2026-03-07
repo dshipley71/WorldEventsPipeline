@@ -1,1 +1,0 @@
-"""World Intelligence live dashboard."""
