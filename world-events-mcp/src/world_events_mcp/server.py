@@ -60,54 +60,10 @@ fetcher = Fetcher(cache=cache, breaker=breaker, default_timeout=_fetcher_timeout
 # ---------------------------------------------------------------------------
 
 TOOLS: list[Tool] = [
-    # --- Markets (7 tools) ---
-    Tool(
-        name="intel_market_quotes",
-        description="Get real-time stock market index quotes (S&P 500, Dow, Nasdaq, FTSE, Nikkei, etc.). Optional: symbols (list of ticker symbols).",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "symbols": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "description": "Ticker symbols (default: major indices)",
-                },
-            },
-        },
-    ),
-    Tool(
-        name="intel_crypto_quotes",
-        description="Get top cryptocurrency prices, market caps, and 7-day sparklines from CoinGecko. Optional: limit (int, default 20).",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "limit": {"type": "integer", "description": "Number of coins (default 20)", "default": 20},
-            },
-        },
-    ),
-    Tool(
-        name="intel_stablecoin_status",
-        description="Check stablecoin peg health (USDT, USDC, DAI, FDUSD). Flags depegs >0.5%.",
-        inputSchema={"type": "object", "properties": {}},
-    ),
-    Tool(
-        name="intel_etf_flows",
-        description="Get Bitcoin spot ETF prices and volumes (IBIT, FBTC, GBTC, ARKB, BITB).",
-        inputSchema={"type": "object", "properties": {}},
-    ),
-    Tool(
-        name="intel_sector_heatmap",
-        description="Get US equity sector performance heatmap (11 SPDR sector ETFs).",
-        inputSchema={"type": "object", "properties": {}},
-    ),
+    # --- Markets (1 tool) ---
     Tool(
         name="intel_macro_signals",
         description="Get 7 key macro signals: Fear & Greed, mempool fees, DXY, VIX, gold, 10Y Treasury, BTC dominance.",
-        inputSchema={"type": "object", "properties": {}},
-    ),
-    Tool(
-        name="intel_commodity_quotes",
-        description="Get commodity futures quotes: gold, silver, crude oil (WTI & Brent), natural gas, corn, wheat, soybeans from Yahoo Finance.",
         inputSchema={"type": "object", "properties": {}},
     ),
     # --- Economic (3 tools) ---
@@ -857,12 +813,6 @@ TOOLS: list[Tool] = [
             },
         },
     ),
-    # --- BTC Technicals (1 tool) ---
-    Tool(
-        name="intel_btc_technicals",
-        description="Bitcoin technical indicators: SMA-50, SMA-200, Mayer Multiple, golden/death cross, distance from ATH, 7d/30d changes.",
-        inputSchema={"type": "object", "properties": {}},
-    ),
     # --- Central Banks (1 tool) ---
     Tool(
         name="intel_central_bank_rates",
@@ -928,20 +878,8 @@ async def _dispatch(name: str, arguments: dict[str, Any]) -> Any:
     """Route tool call to the appropriate source function."""
     match name:
         # Markets
-        case "intel_market_quotes":
-            return await markets.fetch_market_quotes(fetcher, symbols=arguments.get("symbols"))
-        case "intel_crypto_quotes":
-            return await markets.fetch_crypto_quotes(fetcher, limit=arguments.get("limit", 20))
-        case "intel_stablecoin_status":
-            return await markets.fetch_stablecoin_status(fetcher)
-        case "intel_etf_flows":
-            return await markets.fetch_etf_flows(fetcher)
-        case "intel_sector_heatmap":
-            return await markets.fetch_sector_heatmap(fetcher)
         case "intel_macro_signals":
             return await markets.fetch_macro_signals(fetcher)
-        case "intel_commodity_quotes":
-            return await markets.fetch_commodity_quotes(fetcher)
 
         # Economic
         case "intel_world_bank_indicators":
@@ -1237,10 +1175,6 @@ async def _dispatch(name: str, arguments: dict[str, Any]) -> Any:
         # USNI Fleet
         case "intel_usni_fleet":
             return await usni_fleet.fetch_usni_fleet(fetcher)
-
-        # BTC Technicals
-        case "intel_btc_technicals":
-            return await markets.fetch_btc_technicals(fetcher)
 
         # Central Bank Rates
         case "intel_central_bank_rates":

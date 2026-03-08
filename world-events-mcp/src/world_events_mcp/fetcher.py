@@ -29,7 +29,6 @@ _SOURCE_RATE_LIMITS: dict[str, float] = {
     "yahoo-finance": 0.6,       # unofficial — ~100 req/min safe
     "opensky": 6.0,             # free tier: 10 req/min
     "coingecko": 2.0,           # free tier: 30 calls/min
-    "cloudflare-radar": 3.0,    # 20 req/min
     "reddit": 1.5,              # ~60 req/min (be conservative)
     "adsblol": 5.0,             # community API — be very polite
     "polymarket": 1.0,          # be polite

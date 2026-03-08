@@ -70,81 +70,6 @@ def main(ctx: click.Context, json_output: bool) -> None:
 # Markets
 # ---------------------------------------------------------------------------
 
-@main.command(name="markets")
-@click.option("--symbols", "-s", multiple=True, help="Ticker symbols")
-@click.pass_context
-def markets_cmd(ctx: click.Context, symbols: tuple[str, ...]) -> None:
-    """Stock market index quotes."""
-    f = _get_fetcher()
-    sym_list = list(symbols) if symbols else None
-    data = _run(markets.fetch_market_quotes(f, symbols=sym_list))
-
-    if ctx.obj.get("json"):
-        _print_json(data)
-        return
-
-    quotes = data.get("quotes", [])
-    if not quotes:
-        console.print("[yellow]No market data available[/yellow]")
-        return
-
-    table = Table(title="Market Indices", box=box.SIMPLE_HEAVY)
-    table.add_column("Symbol", style="bold")
-    table.add_column("Price", justify="right")
-    table.add_column("Change %", justify="right")
-    table.add_column("Currency")
-
-    for q in quotes:
-        chg = q.get("change_pct") or 0
-        price = q.get("price") or 0
-        style = "green" if chg >= 0 else "red"
-        table.add_row(
-            q.get("symbol", "?"),
-            f"{price:,.2f}",
-            f"[{style}]{chg:+.2f}%[/{style}]",
-            q.get("currency", ""),
-        )
-    console.print(table)
-
-
-@main.command()
-@click.option("--limit", "-n", default=20, help="Number of coins")
-@click.pass_context
-def crypto(ctx: click.Context, limit: int) -> None:
-    """Top cryptocurrency prices."""
-    f = _get_fetcher()
-    data = _run(markets.fetch_crypto_quotes(f, limit=limit))
-
-    if ctx.obj.get("json"):
-        _print_json(data)
-        return
-
-    coins = data.get("coins", [])
-    if not coins:
-        console.print("[yellow]No crypto data available[/yellow]")
-        return
-
-    table = Table(title=f"Top {limit} Cryptocurrencies", box=box.SIMPLE_HEAVY)
-    table.add_column("#", justify="right")
-    table.add_column("Symbol", style="bold")
-    table.add_column("Price", justify="right")
-    table.add_column("24h %", justify="right")
-    table.add_column("Market Cap", justify="right")
-
-    for i, c in enumerate(coins[:limit], 1):
-        chg = c.get("price_change_percentage_24h", 0) or 0
-        style = "green" if chg >= 0 else "red"
-        mcap = c.get("market_cap", 0) or 0
-        table.add_row(
-            str(i),
-            c.get("symbol", "?").upper(),
-            f"${c.get('current_price', 0):,.2f}",
-            f"[{style}]{chg:+.2f}%[/{style}]",
-            f"${mcap:,.0f}",
-        )
-    console.print(table)
-
-
 @main.command()
 @click.pass_context
 def macro(ctx: click.Context) -> None:
@@ -1226,17 +1151,6 @@ def sync_cmd(source: str | None) -> None:
     else:
         removed = f.cache.evict_expired()
         console.print(f"Evicted {removed} expired cache entries")
-
-
-@main.command()
-@click.option("--port", default=8501, type=int, help="Port to listen on")
-@click.option("--host", default="127.0.0.1", help="Host to bind to")
-def dashboard(port: int, host: str) -> None:
-    """Launch the live intelligence dashboard."""
-    from .dashboard.app import run as run_dashboard
-
-    console.print(f"[bold]Starting Intelligence Dashboard[/bold] on http://{host}:{port}")
-    run_dashboard(host=host, port=port)
 
 
 if __name__ == "__main__":

@@ -4,13 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Is
 
-World Events MCP Server — 89 tools across 30+ domains providing real-time global intelligence from free public APIs. Serves three interfaces: MCP stdio (for Claude Code/Cursor), a live Starlette dashboard with SSE, and a Click CLI with Rich output. Python 3.11+, built with hatchling.
+World Events MCP Server — 89 tools across 30+ domains providing real-time global intelligence from free public APIs. Serves two interfaces: MCP stdio (for Claude Code/Cursor) and a Click CLI with Rich output. Python 3.11+, built with hatchling.
 
 ## Commands
 
 ```bash
 # Install
-pip install -e ".[dev,dashboard]"
+pip install -e ".[dev]"
 
 # Run MCP server (stdio mode)
 world-events-mcp
@@ -24,21 +24,15 @@ pytest src/world_events_mcp/tests/test_sources.py::test_fetch_market_quotes -v  
 intel markets                    # stock indices
 intel earthquakes --min-mag 5.0  # USGS quakes
 intel status                     # cache + circuit breaker health
-
-# Dashboard (requires [dashboard] extra)
-intel-dashboard --port 8501
-# Or with .env auto-loaded:
-./run-dashboard.sh
 ```
 
 ## Architecture
 
-Three consumers share the same source modules and infrastructure stack:
+Two consumers share the same source modules and infrastructure stack:
 
 ```
 server.py (MCP stdio)  ─┐
-cli.py (Click CLI)      ├─> sources/*.py ─> Fetcher ─> CircuitBreaker ─> Cache (SQLite)
-dashboard/app.py (SSE)  ─┘                                                  │
+cli.py (Click CLI)      ─┘─> sources/*.py ─> Fetcher ─> CircuitBreaker ─> Cache (SQLite)
                                                                    ~/.cache/world-events-mcp/cache.db
 ```
 
@@ -53,14 +47,12 @@ dashboard/app.py (SSE)  ─┘                                                  
 
 **Static config** (`config/*.py`): Curated datasets — 22 intel hotspots, 70+ military bases, 40 ports, 24 pipelines, 24 nuclear facilities, 34 undersea cables, 48 AI datacenters, 27 spaceports, 27 mineral deposits, 82 stock exchanges, 105 major cities, 28 world leaders, 36 APT groups.
 
-**Dashboard** (`dashboard/`): Self-contained Starlette app with a single `index.html` template (no frontend build step). SSE endpoint streams all domains in parallel via `asyncio.gather()`, refreshes every 30 seconds. Loads `.env` from project root on startup.
-
 ## Adding a New Tool
 
 1. Create `sources/your_source.py` with `async def fetch_your_data(fetcher: Fetcher, **kwargs) -> dict`
 2. Use `fetcher.get_json(url, source="your-source", cache_key=..., cache_ttl=300)` — this gives you caching, retries, circuit breaking, and rate limiting automatically
 3. In `server.py`: import the module, add a `Tool(...)` to the `TOOLS` list, add a `case` to `_dispatch()`
-4. Optionally add to `dashboard/app.py` (SSE endpoint) and `cli.py` (Click command)
+4. Optionally add a CLI command to `cli.py`
 5. Add tests using `respx` to mock HTTP (see `tests/test_sources.py` for pattern)
 
 ## Key Patterns

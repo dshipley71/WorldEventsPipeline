@@ -16,12 +16,10 @@ dependencies = [
     "pydantic>=2.0.0",
     "feedparser>=6.0.0",
     "click>=8.1.0",
-    "jinja2>=3.1.0",
     "rich>=13.0.0",
 ]
 
 [project.optional-dependencies]
-dashboard = ["starlette>=0.37.0", "uvicorn>=0.29.0"]
 pdf = ["weasyprint>=62.0"]
 dev = [
     "pytest>=8.0.0",
@@ -33,7 +31,6 @@ dev = [
 [project.scripts]
 world-events-mcp = "world_events_mcp.server:run"
 intel = "world_events_mcp.cli:main"
-intel-dashboard = "world_events_mcp.dashboard.app:run"
 
 [build-system]
 requires = ["hatchling"]
