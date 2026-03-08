@@ -183,6 +183,81 @@ TOOLS: list[Tool] = [
         },
     ),
     Tool(
+        name="intel_gdelt_timeline",
+        description=(
+            "GDELT DOC 2.0 coverage timeline for one or two queries. "
+            "Returns a time-series of news volume (%), raw counts, average tone, "
+            "or per-country / per-language breakdowns — ready for charting. "
+            "When two queries are supplied both series are returned in a single response "
+            "so they can be overlaid on the same chart.\n\n"
+            "Modes:\n"
+            "  timelinevol          – % of global news coverage over time (default)\n"
+            "  timelinevolraw       – raw article counts over time\n"
+            "  timelinetone         – average tone (positive/negative) over time\n"
+            "  timelinesourcecountry– volume broken down by publishing country\n"
+            "  timelinelang         – volume broken down by language\n\n"
+            "Timespan examples: '15min', '6h', '7d' (default), '2w', '1m', '3m'.\n"
+            "Smoothing 1-30 reduces noise; higher values shift peaks slightly right."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Primary search query. Supports all GDELT operators.",
+                    "default": "conflict",
+                },
+                "query2": {
+                    "type": "string",
+                    "description": "Optional second query for side-by-side comparison on the same timeline.",
+                },
+                "mode": {
+                    "type": "string",
+                    "description": "Timeline mode (see tool description).",
+                    "enum": [
+                        "timelinevol",
+                        "timelinevolraw",
+                        "timelinetone",
+                        "timelinesourcecountry",
+                        "timelinelang",
+                    ],
+                    "default": "timelinevol",
+                },
+                "timespan": {
+                    "type": "string",
+                    "description": "Lookback window: '15min', '6h', '7d' (default), '2w', '1m', '3m'.",
+                    "default": "7d",
+                },
+                "smoothing": {
+                    "type": "integer",
+                    "description": "Moving-window smoothing steps 1–30 (default 3). Higher = smoother, slight rightward peak shift.",
+                    "default": 3,
+                },
+                "sourcelang": {
+                    "type": "string",
+                    "description": "Restrict to articles in this language. ISO 639 code (e.g. 'zh', 'ru', 'ar').",
+                },
+                "sourcecountry": {
+                    "type": "string",
+                    "description": "Restrict to outlets in this country. FIPS-2 code (e.g. 'US', 'RS', 'CN').",
+                },
+                "theme": {
+                    "type": "string",
+                    "description": "GDELT GKG theme filter. Examples: TERROR, MILITARY, WMD, PROTEST, SANCTION.",
+                },
+                "startdatetime": {
+                    "type": "string",
+                    "description": "Precise start in YYYYMMDDHHMMSS UTC (overrides timespan). Max 3 months back.",
+                },
+                "enddatetime": {
+                    "type": "string",
+                    "description": "Precise end in YYYYMMDDHHMMSS UTC.",
+                },
+            },
+            "required": ["query"],
+        },
+    ),
+    Tool(
         name="intel_status",
         description="Get server health, circuit breaker status, cache statistics, and data source freshness.",
         inputSchema={"type": "object", "properties": {}},
@@ -225,6 +300,63 @@ async def _dispatch(name: str, arguments: dict[str, Any]) -> Any:
                 theme=arguments.get("theme"),
                 timelinesmooth=arguments.get("timelinesmooth"),
             )
+
+        case "intel_gdelt_timeline":
+            query = arguments.get("query", "conflict")
+            query2 = arguments.get("query2")
+            mode = arguments.get("mode", "timelinevol")
+            timespan = arguments.get("timespan", "7d")
+            smoothing = arguments.get("smoothing", 3)
+            sourcelang = arguments.get("sourcelang")
+            sourcecountry = arguments.get("sourcecountry")
+            theme = arguments.get("theme")
+            startdatetime = arguments.get("startdatetime")
+            enddatetime = arguments.get("enddatetime")
+
+            # Fetch primary series
+            primary = await news.fetch_gdelt_search(
+                fetcher,
+                query=query,
+                mode=mode,
+                timespan=timespan if not startdatetime else None,
+                startdatetime=startdatetime,
+                enddatetime=enddatetime,
+                sourcelang=sourcelang,
+                sourcecountry=sourcecountry,
+                theme=theme,
+                timelinesmooth=smoothing,
+            )
+
+            result: dict = {
+                "mode": mode,
+                "timespan": timespan,
+                "smoothing": smoothing,
+                "series": [
+                    {"query": query, "data": primary.get("timeline", [])}
+                ],
+                "source": "gdelt",
+                "timestamp": primary.get("timestamp"),
+            }
+
+            # Optionally fetch second series for comparison
+            if query2:
+                secondary = await news.fetch_gdelt_search(
+                    fetcher,
+                    query=query2,
+                    mode=mode,
+                    timespan=timespan if not startdatetime else None,
+                    startdatetime=startdatetime,
+                    enddatetime=enddatetime,
+                    sourcelang=sourcelang,
+                    sourcecountry=sourcecountry,
+                    theme=theme,
+                    timelinesmooth=smoothing,
+                )
+                result["series"].append(
+                    {"query": query2, "data": secondary.get("timeline", [])}
+                )
+
+            return result
 
         case "intel_status":
             return {
