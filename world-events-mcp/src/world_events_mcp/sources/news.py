@@ -375,7 +375,7 @@ def _truncate(text: str | None, max_len: int = 200) -> str:
 
 async def fetch_news_feed(
     fetcher: Fetcher,
-    category: str | None = None,
+    categories: list[str] | str | None = None,
     limit: int = 50,
 ) -> dict:
     """Aggregate news from 20+ RSS feeds across intelligence/news categories.
@@ -385,34 +385,40 @@ async def fetch_news_feed(
 
     Args:
         fetcher: Shared HTTP fetcher with caching and circuit breaking.
-        category: Optional category key (geopolitics, security, technology,
-                  finance, military, science). If None, fetches all categories.
-        limit: Maximum number of items to return.
+        categories: Optional category key(s). Accepts a single string or a list
+                    of category keys (geopolitics, security, technology,
+                    finance, military, science, etc.). If None, fetches all.
+        limit: Maximum number of articles to return.
 
     Returns:
-        Dict with items list, count, categories fetched, source, and timestamp.
+        Dict with articles list, count, categories fetched, source, and timestamp.
     """
     if feedparser is None:
         return {
             "error": "feedparser not installed — run: pip install feedparser",
-            "items": [],
+            "articles": [],
             "count": 0,
         }
 
     now = datetime.now(timezone.utc)
 
+    # Normalise categories argument to a list or None
+    if isinstance(categories, str):
+        categories = [categories]
+
     # Determine which categories to fetch
-    if category is not None:
-        if category not in _RSS_FEEDS:
+    if categories is not None:
+        invalid = [c for c in categories if c not in _RSS_FEEDS]
+        if invalid:
             return {
-                "items": [],
+                "articles": [],
                 "count": 0,
                 "categories_fetched": [],
-                "error": f"Unknown category '{category}'. Valid: {list(_RSS_FEEDS.keys())}",
+                "error": f"Unknown categories: {invalid}. Valid: {list(_RSS_FEEDS.keys())}",
                 "source": "rss-aggregator",
                 "timestamp": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
             }
-        categories_to_fetch = {category: _RSS_FEEDS[category]}
+        categories_to_fetch = {c: _RSS_FEEDS[c] for c in categories}
     else:
         categories_to_fetch = dict(_RSS_FEEDS)
 
@@ -448,6 +454,7 @@ async def fetch_news_feed(
                 "link": entry.get("link", ""),
                 "published": published,
                 "summary": _truncate(summary_raw, 200),
+                "source": feed_name,
                 "feed_name": feed_name,
                 "category": cat,
                 "source_tier": SOURCE_TIERS.get(feed_name, "unknown"),
@@ -485,7 +492,7 @@ async def fetch_news_feed(
     all_items = all_items[:limit]
 
     return {
-        "items": all_items,
+        "articles": all_items,
         "count": len(all_items),
         "categories_fetched": list(categories_to_fetch.keys()),
         "source": "rss-aggregator",
