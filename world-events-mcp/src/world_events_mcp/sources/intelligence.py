@@ -753,11 +753,7 @@ async def fetch_temporal_anomalies(fetcher: Fetcher) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Function 8: Social Unrest Events (Protests + Riots)
-# ---------------------------------------------------------------------------
-
-# ---------------------------------------------------------------------------
-# Function 9: Hotspot Escalation Scoring
+# Function 8: Hotspot Escalation Scoring
 # ---------------------------------------------------------------------------
 
 async def fetch_hotspot_escalation(fetcher: Fetcher) -> dict:
