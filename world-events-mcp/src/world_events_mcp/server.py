@@ -75,16 +75,6 @@ TOOLS: list[Tool] = [
         },
     ),
     Tool(
-        name="intel_trending_keywords",
-        description="Detect trending keywords from recent news headlines. Keyword spike detection across 119 RSS feeds.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "min_count": {"type": "integer", "description": "Minimum occurrences (default 3)", "default": 3},
-            },
-        },
-    ),
-    Tool(
         name="intel_gdelt_search",
         description=(
             "Search GDELT 2.0 Doc API across 65 languages of global news coverage. "
@@ -279,12 +269,6 @@ async def _dispatch(name: str, arguments: dict[str, Any]) -> Any:
                 limit=arguments.get("limit", 50),
             )
 
-        case "intel_trending_keywords":
-            return await news.fetch_trending_keywords(
-                fetcher,
-                min_count=arguments.get("min_count", 3),
-            )
-
         case "intel_gdelt_search":
             return await news.fetch_gdelt_search(
                 fetcher,
@@ -359,11 +343,20 @@ async def _dispatch(name: str, arguments: dict[str, Any]) -> Any:
             return result
 
         case "intel_status":
+            all_breakers = breaker.status()
+            # Only surface sources that have seen failures — keeps output clean
+            # after fetching 100+ RSS feeds (all-healthy = empty dict)
+            problem_breakers = {
+                src: info for src, info in all_breakers.items()
+                if info.get("total_failures", 0) > 0 or info.get("status") != "closed"
+            }
             return {
-                "circuit_breakers": breaker.status(),
+                "sources_tracked": len(all_breakers),
+                "problem_sources": len(problem_breakers),
+                "circuit_breakers": problem_breakers,
                 "cache": cache.stats(),
                 "cache_freshness": cache.freshness(),
-                "sources": {
+                "data_sources": {
                     "news": ["rss-aggregator (119 feeds, 24 categories)", "gdelt"],
                 },
             }
