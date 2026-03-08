@@ -40,7 +40,7 @@ _RSS_FEEDS: dict[str, list[tuple[str, str]]] = {
     "security": [
         ("BleepingComputer", "https://www.bleepingcomputer.com/feed/"),
         ("Krebs on Security", "https://krebsonsecurity.com/feed/"),
-        ("The Hacker News", "https://feeds.feedburner.com/TheHackersNews"),
+        ("The Hacker News", "https://thehackernews.com/feeds/posts/default"),
         ("Schneier on Security", "https://www.schneier.com/feed/atom/"),
         ("Dark Reading", "https://www.darkreading.com/rss.xml"),
         ("CISA Alerts", "https://www.cisa.gov/cybersecurity-advisories/all.xml"),
@@ -57,10 +57,11 @@ _RSS_FEEDS: dict[str, list[tuple[str, str]]] = {
     ],
     "finance": [
         ("CNBC", "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114"),
-        ("MarketWatch", "https://feeds.content.dowjones.io/public/rss/mw_topstories"),
+        ("MarketWatch", "https://www.marketwatch.com/rss/topstories"),
         ("FT World", "https://news.google.com/rss/search?q=site:ft.com&hl=en-US&gl=US&ceid=US:en"),
         ("Bloomberg Markets", "https://news.google.com/rss/search?q=bloomberg+markets+finance&hl=en-US&gl=US&ceid=US:en"),
-        ("WSJ World News", "https://feeds.a.dj.com/rss/RSSWorldNews.xml"),        ("Zero Hedge", "https://feeds.feedburner.com/zerohedge/feed"),
+        ("WSJ Markets", "https://news.google.com/rss/search?q=site:wsj.com+markets&hl=en-US&gl=US&ceid=US:en"),
+        ("Zero Hedge", "https://www.zerohedge.com/fullrss2.xml"),
     ],
     "military": [
         ("Defense One", "https://www.defenseone.com/rss/all/"),
@@ -120,7 +121,8 @@ _RSS_FEEDS: dict[str, list[tuple[str, str]]] = {
     "multilingual": [
         ("BBC Mundo", "https://feeds.bbci.co.uk/mundo/rss.xml"),
         ("DW Español", "https://rss.dw.com/xml/rss-es-all"),
-        ("DW Deutsch", "https://rss.dw.com/xml/rss-de-all"),        ("France24 Français", "https://www.france24.com/fr/rss"),
+        ("DW Deutsch", "https://rss.dw.com/xml/rss-de-all"),
+        ("France24 Français", "https://www.france24.com/fr/rss"),
         ("RFI Français", "https://www.rfi.fr/fr/rss"),
         ("UN News Español", "https://news.un.org/feed/subscribe/es/news/all/rss.xml"),
         ("UN News Français", "https://news.un.org/feed/subscribe/fr/news/all/rss.xml"),
@@ -151,7 +153,7 @@ _RSS_FEEDS: dict[str, list[tuple[str, str]]] = {
         ("DW Europe", "https://rss.dw.com/rss/en/eu/rss-en-eu"),
     ],
     "south_asia": [
-        ("NDTV", "https://feeds.feedburner.com/ndtvnews-top-stories"),
+        ("NDTV", "https://www.ndtv.com/rss/news"),
         ("Dawn Pakistan", "https://www.dawn.com/feeds/home"),
         ("Scroll India", "https://scroll.in/feed"),
     ],
